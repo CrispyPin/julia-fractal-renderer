@@ -1,5 +1,5 @@
 #![windows_subsystem = "windows"]
-use std::time::SystemTime;
+use std::{env, time::SystemTime};
 
 use eframe::{
 	egui::{self, DragValue, RichText, Slider, TextureOptions},
@@ -108,12 +108,8 @@ impl eframe::App for JuliaGUI {
 			.resizable(false)
 			.exact_width(200.0)
 			.show(ctx, |ui| {
-				ui.label(RichText::new("Fractal settings").heading());
-				if ui.button("Update preview").clicked() {
-					self.settings_changed = true;
-				}
 				ui.label(format!(
-					"last preview render took {:.2}ms",
+					"Preview render took {:.2}ms",
 					self.preview_render_ms
 				));
 
@@ -121,9 +117,9 @@ impl eframe::App for JuliaGUI {
 				let set_cx = ui.add(Slider::new(&mut self.render_options.cx, -2.0..=2.0));
 				ui.label("CY:");
 				let set_cy = ui.add(Slider::new(&mut self.render_options.cy, -2.0..=2.0));
-				ui.label("Image width in space units:");
+				ui.label("render width:");
 				let set_unit_width =
-					ui.add(Slider::new(&mut self.render_options.unit_width, 0.01..=6.0));
+					ui.add(Slider::new(&mut self.render_options.unit_width, 0.1..=6.0));
 				ui.label("Fill style:");
 				ui.horizontal(|ui| {
 					let set_black = ui.radio_value(
@@ -141,6 +137,11 @@ impl eframe::App for JuliaGUI {
 					}
 				});
 
+				ui.label("Colour (RGB)");
+				let set_red = ui.add(Slider::new(&mut self.color.0, 0..=32));
+				let set_green = ui.add(Slider::new(&mut self.color.1, 0..=32));
+				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=32));
+
 				ui.label("Preview iterations:");
 				let set_iter = ui.add(
 					Slider::new(&mut self.render_options.max_iterations, 5..=256)
@@ -148,7 +149,7 @@ impl eframe::App for JuliaGUI {
 				);
 
 				ui.label(RichText::new("Render settings").heading());
-				ui.label("preview resolution:");
+				ui.label("Preview resolution:");
 				ui.horizontal(|ui| {
 					let set_width = ui.add(
 						DragValue::new(&mut self.render_options.width).clamp_range(128..=16384),
@@ -178,21 +179,28 @@ impl eframe::App for JuliaGUI {
 						.add_filter("PNG file", &["png"])
 						.show_save_single_file()
 					{
-						self.export_name = path.to_string_lossy().to_string();
+						self.export_name = path
+							.strip_prefix(env::current_dir().unwrap())
+							.unwrap_or(&path)
+							.to_string_lossy()
+							.to_string();
 					}
 				}
-				ui.label(format!("selected path: {}", &self.export_name));
-				if ui.button("Render").clicked() {
-					self.export_render();
-				}
-				ui.label(format!(
-					"last exported render took {:.2}ms",
-					self.export_render_ms
-				));
+				ui.label(&self.export_name);
+				ui.horizontal(|ui| {
+					if ui.button("Render").clicked() {
+						self.export_render();
+					}
+					if !self.export_render_ms.is_nan() {
+						ui.label(format!("(took {:.2}ms)", self.export_render_ms));
+					}
+				});
 
 				if set_cx.changed()
 					|| set_cy.changed() || set_unit_width.changed()
 					|| set_iter.changed()
+					|| set_red.changed() || set_green.changed()
+					|| set_blue.changed()
 				{
 					self.settings_changed = true;
 				}
