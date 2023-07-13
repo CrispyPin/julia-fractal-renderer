@@ -1,6 +1,7 @@
 use image::{Rgb, RgbImage};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RenderOptions {
 	pub width: u32,
 	pub height: u32,
@@ -11,10 +12,24 @@ pub struct RenderOptions {
 	pub fill_style: FillStyle,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum FillStyle {
 	Bright,
 	Black,
+}
+
+impl Default for RenderOptions {
+	fn default() -> Self {
+		Self {
+			width: 512,
+			height: 512,
+			unit_width: 4.0,
+			max_iterations: 128,
+			cx: -0.8,
+			cy: -0.27,
+			fill_style: FillStyle::Bright,
+		}
+	}
 }
 
 pub fn render(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
