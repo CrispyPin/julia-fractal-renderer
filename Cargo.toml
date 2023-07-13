@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 eframe = "0.22.0"
 image = { version = "0.24.6", default_features = false, features = ["png"] }
+native-dialog = "0.6.4"
 
 # Enable high optimizations for dependencies
 [profile.dev.package."*"]

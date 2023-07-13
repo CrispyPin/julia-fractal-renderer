@@ -8,6 +8,7 @@ use eframe::{
 };
 use generate::{render, FillStyle, RenderOptions};
 use image::EncodableLayout;
+use native_dialog::FileDialog;
 
 mod generate;
 
@@ -171,8 +172,17 @@ impl eframe::App for JuliaGUI {
 					self.export_res_multiplier * self.render_options.height
 				));
 
-				let render_button = ui.button(format!("Render to '{}'", &self.export_name));
-				if render_button.clicked() {
+				if ui.button("Select file").clicked() {
+					if let Ok(Some(path)) = FileDialog::new()
+						.set_filename(&self.export_name)
+						.add_filter("PNG file", &["png"])
+						.show_save_single_file()
+					{
+						self.export_name = path.to_string_lossy().to_string();
+					}
+				}
+				ui.label(format!("selected path: {}", &self.export_name));
+				if ui.button("Render").clicked() {
 					self.export_render();
 				}
 				ui.label(format!(
