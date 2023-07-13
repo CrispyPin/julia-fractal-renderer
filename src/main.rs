@@ -149,9 +149,13 @@ impl eframe::App for JuliaGUI {
 				ui.label(RichText::new("Render settings").heading());
 				ui.label("preview resolution:");
 				ui.horizontal(|ui| {
-					let set_width = ui.add(DragValue::new(&mut self.render_options.width));
+					let set_width = ui.add(
+						DragValue::new(&mut self.render_options.width).clamp_range(128..=16384),
+					);
 					ui.label("x");
-					let set_height = ui.add(DragValue::new(&mut self.render_options.height));
+					let set_height = ui.add(
+						DragValue::new(&mut self.render_options.height).clamp_range(128..=16384),
+					);
 					if set_width.changed() || set_height.changed() {
 						self.settings_changed = true;
 					}
