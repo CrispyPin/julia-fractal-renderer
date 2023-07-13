@@ -2,14 +2,21 @@ use std::time::SystemTime;
 
 use image::{Rgb, RgbImage};
 
-const WIDTH: u32 = 4096;
-const HEIGHT: u32 = WIDTH / 2;
+const WIDTH: u32 = 1920 * 2;
+const HEIGHT: u32 = 1080 * 2;
 
 const TOTAL_UNITS_WIDE: f64 = 4.0;
 
 const MAX_ITER: u32 = 512;
-const CX: f64 = -0.98;
+const CX: f64 = -0.981;
 const CY: f64 = -0.277;
+
+// const COL_R: u8 = 4;
+// const COL_G: u8 = 8;
+// const COL_B: u8 = 12;
+const COL_R: u8 = 12;
+const COL_G: u8 = 5;
+const COL_B: u8 = 10;
 
 const WIDTH_F: f64 = WIDTH as f64;
 const HEIGHT_F: f64 = HEIGHT as f64;
@@ -29,13 +36,9 @@ fn main() {
 		"Generating took {} ms",
 		start_time.elapsed().unwrap().as_millis()
 	);
-	let start_time = SystemTime::now();
-	let filename = format!("julia_set_cx{:.3}_cy{:.3}.png", CX, CY);
+
+	let filename = format!("julia_set_cx{}_cy{}.png", CX, CY);
 	img.save(filename).unwrap();
-	println!(
-		"Saving took {} ms",
-		start_time.elapsed().unwrap().as_millis()
-	);
 }
 
 fn fractal(x: f64, y: f64) -> Rgb<u8> {
@@ -58,8 +61,8 @@ fn fractal(x: f64, y: f64) -> Rgb<u8> {
 
 	let i = iterations.min(255) as u8;
 	Rgb([
-		i.saturating_mul(4),
-		i.saturating_mul(8),
-		i.saturating_mul(12),
+		i.saturating_mul(COL_R),
+		i.saturating_mul(COL_G),
+		i.saturating_mul(COL_B),
 	])
 }
