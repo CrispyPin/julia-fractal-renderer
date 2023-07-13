@@ -1,68 +1,176 @@
+#![windows_subsystem = "windows"]
 use std::time::SystemTime;
 
-use image::{Rgb, RgbImage};
+use eframe::{
+	egui::{self, RichText, Slider},
+	epaint::{TextureHandle, Vec2},
+	Frame, NativeOptions,
+};
+use generate::{render, FillStyle, RenderOptions};
+use image::EncodableLayout;
 
-const WIDTH: u32 = 1920 * 2;
-const HEIGHT: u32 = 1080 * 2;
-
-const TOTAL_UNITS_WIDE: f64 = 4.0;
-
-const MAX_ITER: u32 = 512;
-const CX: f64 = -0.981;
-const CY: f64 = -0.277;
-
-// const COL_R: u8 = 4;
-// const COL_G: u8 = 8;
-// const COL_B: u8 = 12;
-const COL_R: u8 = 12;
-const COL_G: u8 = 5;
-const COL_B: u8 = 10;
-
-const WIDTH_F: f64 = WIDTH as f64;
-const HEIGHT_F: f64 = HEIGHT as f64;
-const PIXELS_PER_UNIT: f64 = WIDTH_F / TOTAL_UNITS_WIDE;
+mod generate;
 
 fn main() {
-	let start_time = SystemTime::now();
+	let native_options = NativeOptions {
+		initial_window_size: Some(Vec2::new(1280.0, 720.0)),
+		..NativeOptions::default()
+	};
 
-	let mut img = RgbImage::new(WIDTH, HEIGHT);
-	for y in 0..HEIGHT {
-		for x in 0..WIDTH {
-			let pixel = fractal(x as f64, y as f64);
-			img.put_pixel(x, y, pixel);
-		}
-	}
-	println!(
-		"Generating took {} ms",
-		start_time.elapsed().unwrap().as_millis()
-	);
-
-	let filename = format!("julia_set_cx{}_cy{}.png", CX, CY);
-	img.save(filename).unwrap();
+	eframe::run_native(
+		"Julia fractal render GUI",
+		native_options,
+		Box::new(|cc| Box::new(JuliaGUI::new(cc))),
+	)
+	.unwrap();
 }
 
-fn fractal(x: f64, y: f64) -> Rgb<u8> {
-	let mut x = (x - WIDTH_F / 2.0) / PIXELS_PER_UNIT;
-	let mut y = (y - HEIGHT_F / 2.0) / PIXELS_PER_UNIT;
+struct JuliaGUI {
+	color: (u8, u8, u8),
+	preview: TextureHandle,
+	render_options: RenderOptions,
+	preview_render_ms: f64,
+	export_render_ms: f64,
+	export_res_multiplier: u32,
+	export_iterations: u32,
+	export_name: String,
+	settings_changed: bool,
+}
 
-	let mut iterations = 0;
-
-	while (x * x + y * y) < 4.0 {
-		(x, y) = (
-			x * x - y * y + CX, //
-			2.0 * x * y + CY,
+impl JuliaGUI {
+	fn new(cc: &eframe::CreationContext<'_>) -> Self {
+		let preview = cc.egui_ctx.load_texture(
+			"my-image",
+			egui::ColorImage::from_rgb([1, 1], &[0, 0, 0]),
+			Default::default(),
 		);
+		let preview_quality = RenderOptions {
+			width: 512,
+			height: 512,
+			unit_width: 4.0,
+			max_iterations: 128,
+			cx: -0.981,
+			cy: -0.277,
+			fill_style: FillStyle::Bright,
+		};
 
-		iterations += 1;
-		if iterations == MAX_ITER {
-			return Rgb([0, 0, 0]);
+		Self {
+			color: (12, 5, 10),
+			preview,
+			render_options: preview_quality,
+			preview_render_ms: 0.0,
+			export_render_ms: f64::NAN,
+			export_res_multiplier: 4,
+			export_iterations: 512,
+			export_name: String::from("julia_set.png"),
+			settings_changed: true,
 		}
 	}
 
-	let i = iterations.min(255) as u8;
-	Rgb([
-		i.saturating_mul(COL_R),
-		i.saturating_mul(COL_G),
-		i.saturating_mul(COL_B),
-	])
+	fn update_preview(&mut self) {
+		let start_time = SystemTime::now();
+		let preview = render(&self.render_options, self.color);
+		self.preview.set(
+			egui::ColorImage::from_rgb(
+				[preview.width() as usize, preview.height() as usize],
+				preview.as_bytes(),
+			),
+			Default::default(),
+		);
+		self.preview_render_ms = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
+	}
+
+	fn export_render(&mut self) {
+		let start_time = SystemTime::now();
+		let settings = RenderOptions {
+			width: self.render_options.width * self.export_res_multiplier,
+			height: self.render_options.height * self.export_res_multiplier,
+			max_iterations: self.export_iterations,
+			..self.render_options.clone()
+		};
+		let image = render(&settings, self.color);
+		if let Err(e) = image.save(&self.export_name) {
+			println!("Error exporting render: {e}");
+		}
+		self.export_render_ms = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
+	}
+}
+
+impl eframe::App for JuliaGUI {
+	fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
+		if self.settings_changed {
+			self.update_preview();
+			self.settings_changed = false;
+		}
+
+		egui::SidePanel::left("main_left_panel")
+			.resizable(false)
+			.exact_width(200.0)
+			.show(ctx, |ui| {
+				if ui.button("Update preview").clicked() {
+					self.settings_changed = true;
+				}
+				ui.label(format!(
+					"last preview render took {:.2}ms",
+					self.preview_render_ms
+				));
+
+				if ui
+					.button(format!("Render to '{}'", &self.export_name))
+					.clicked()
+				{
+					self.export_render();
+				}
+
+				ui.label(format!(
+					"last exported render took {:.2}ms",
+					self.export_render_ms
+				));
+
+				ui.label("CX:");
+				let set_cx = ui.add(Slider::new(&mut self.render_options.cx, -2.0..=2.0));
+				ui.label("CY:");
+				let set_cy = ui.add(Slider::new(&mut self.render_options.cy, -2.0..=2.0));
+				ui.label("Image width in space units:");
+				let set_unit_width =
+					ui.add(Slider::new(&mut self.render_options.unit_width, 0.01..=6.0));
+				ui.label("Fill style:");
+				ui.horizontal(|ui| {
+					let set_black = ui.radio_value(
+						&mut self.render_options.fill_style,
+						FillStyle::Black,
+						"Black",
+					);
+					let set_bright = ui.radio_value(
+						&mut self.render_options.fill_style,
+						FillStyle::Bright,
+						"Bright",
+					);
+					if set_bright.changed() || set_black.changed() {
+						self.settings_changed = true;
+					}
+				});
+
+				ui.label(RichText::new("Quality settings").heading());
+				ui.label("iterations:");
+				let set_iter = ui.add(
+					Slider::new(&mut self.render_options.max_iterations, 5..=256)
+						.clamp_to_range(false),
+				);
+				//todo resolution
+
+				if set_cx.changed()
+					|| set_cy.changed() || set_unit_width.changed()
+					|| set_iter.changed()
+				{
+					self.settings_changed = true;
+				}
+			});
+
+		egui::CentralPanel::default().show(ctx, |ui| {
+			ui.image(&self.preview, self.preview.size_vec2());
+		});
+	}
+
+	fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {}
 }

@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+eframe = "0.22.0"
 image = { version = "0.24.6", default_features = false, features = ["png"] }
 
 # Enable high optimizations for dependencies
