@@ -2,7 +2,7 @@
 use std::time::SystemTime;
 
 use eframe::{
-	egui::{self, RichText, Slider},
+	egui::{self, DragValue, RichText, Slider, TextureOptions},
 	epaint::{TextureHandle, Vec2},
 	Frame, NativeOptions,
 };
@@ -40,9 +40,9 @@ struct JuliaGUI {
 impl JuliaGUI {
 	fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		let preview = cc.egui_ctx.load_texture(
-			"my-image",
+			"preview_image",
 			egui::ColorImage::from_rgb([1, 1], &[0, 0, 0]),
-			Default::default(),
+			TextureOptions::default(),
 		);
 		let preview_quality = RenderOptions {
 			width: 512,
@@ -60,7 +60,7 @@ impl JuliaGUI {
 			render_options: preview_quality,
 			preview_render_ms: 0.0,
 			export_render_ms: f64::NAN,
-			export_res_multiplier: 4,
+			export_res_multiplier: 8,
 			export_iterations: 512,
 			export_name: String::from("julia_set.png"),
 			settings_changed: true,
@@ -75,7 +75,7 @@ impl JuliaGUI {
 				[preview.width() as usize, preview.height() as usize],
 				preview.as_bytes(),
 			),
-			Default::default(),
+			TextureOptions::default(),
 		);
 		self.preview_render_ms = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
 	}
@@ -89,8 +89,8 @@ impl JuliaGUI {
 			..self.render_options.clone()
 		};
 		let image = render(&settings, self.color);
-		if let Err(e) = image.save(&self.export_name) {
-			println!("Error exporting render: {e}");
+		if let Err(err) = image.save(&self.export_name) {
+			println!("Error exporting render: {err}");
 		}
 		self.export_render_ms = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
 	}
@@ -107,24 +107,13 @@ impl eframe::App for JuliaGUI {
 			.resizable(false)
 			.exact_width(200.0)
 			.show(ctx, |ui| {
+				ui.label(RichText::new("Fractal settings").heading());
 				if ui.button("Update preview").clicked() {
 					self.settings_changed = true;
 				}
 				ui.label(format!(
 					"last preview render took {:.2}ms",
 					self.preview_render_ms
-				));
-
-				if ui
-					.button(format!("Render to '{}'", &self.export_name))
-					.clicked()
-				{
-					self.export_render();
-				}
-
-				ui.label(format!(
-					"last exported render took {:.2}ms",
-					self.export_render_ms
 				));
 
 				ui.label("CX:");
@@ -151,13 +140,41 @@ impl eframe::App for JuliaGUI {
 					}
 				});
 
-				ui.label(RichText::new("Quality settings").heading());
-				ui.label("iterations:");
+				ui.label("Preview iterations:");
 				let set_iter = ui.add(
 					Slider::new(&mut self.render_options.max_iterations, 5..=256)
 						.clamp_to_range(false),
 				);
-				//todo resolution
+
+				ui.label(RichText::new("Render settings").heading());
+				ui.label("preview resolution:");
+				ui.horizontal(|ui| {
+					let set_width = ui.add(DragValue::new(&mut self.render_options.width));
+					ui.label("x");
+					let set_height = ui.add(DragValue::new(&mut self.render_options.height));
+					if set_width.changed() || set_height.changed() {
+						self.settings_changed = true;
+					}
+				});
+
+				ui.label("Export iterations:");
+				ui.add(Slider::new(&mut self.export_iterations, 5..=1024).clamp_to_range(false));
+				ui.label("Resolution multiplier:");
+				ui.add(Slider::new(&mut self.export_res_multiplier, 1..=32));
+				ui.label(format!(
+					"Export resolution: {}x{}",
+					self.export_res_multiplier * self.render_options.width,
+					self.export_res_multiplier * self.render_options.height
+				));
+
+				let render_button = ui.button(format!("Render to '{}'", &self.export_name));
+				if render_button.clicked() {
+					self.export_render();
+				}
+				ui.label(format!(
+					"last exported render took {:.2}ms",
+					self.export_render_ms
+				));
 
 				if set_cx.changed()
 					|| set_cy.changed() || set_unit_width.changed()

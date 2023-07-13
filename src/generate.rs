@@ -20,15 +20,15 @@ pub enum FillStyle {
 pub fn render(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
 	let mut img = RgbImage::new(q.width, q.height);
 
-	let width = q.width as f64;
-	let height = q.height as f64;
+	let width: f64 = q.width.into();
+	let height: f64 = q.height.into();
 	let ppu = width / q.unit_width;
 
 	for y in 0..q.height {
 		for x in 0..q.width {
 			let pixel = {
-				let x = (x as f64 - width / 2.0) / ppu;
-				let y = (y as f64 - height / 2.0) / ppu;
+				let x = (f64::from(x) - width / 2.0) / ppu;
+				let y = (f64::from(y) - height / 2.0) / ppu;
 
 				let iter = julia(x, y, q.cx, q.cy, q.max_iterations);
 				if q.fill_style == FillStyle::Black && iter == q.max_iterations {
@@ -57,5 +57,5 @@ fn julia(mut x: f64, mut y: f64, cx: f64, cy: f64, max_iter: u32) -> u32 {
 		);
 		iter += 1;
 	}
-	return iter;
+	iter
 }
