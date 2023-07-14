@@ -41,7 +41,7 @@ struct JuliaGUI {
 	color: (u8, u8, u8),
 	#[serde(skip)]
 	preview: Option<TextureHandle>,
-	render_options: RenderOptions,
+	settings: RenderOptions,
 	#[serde(skip)]
 	preview_render_ms: f64,
 	#[serde(skip)]
@@ -73,7 +73,7 @@ impl Default for JuliaGUI {
 		Self {
 			color: (12, 5, 10),
 			preview: None,
-			render_options: RenderOptions::default(),
+			settings: RenderOptions::default(),
 			preview_render_ms: 0.0,
 			export_render_ms: None,
 			export_res_power: 3,
@@ -142,9 +142,9 @@ impl JuliaGUI {
 
 	fn update_preview(&mut self) {
 		let start_time = SystemTime::now();
-		let mut frame = render(&self.render_options, self.color);
+		let mut frame = render(&self.settings, self.color);
 		if self.preview_point {
-			frame = view_point(&self.render_options, frame);
+			frame = view_point(&self.settings, frame);
 		}
 
 		if let Some(preview) = &mut self.preview {
@@ -164,10 +164,10 @@ impl JuliaGUI {
 		if let Some(channel) = &self.render_thread {
 			let res_mul = 1 << self.export_res_power;
 			let settings = RenderOptions {
-				width: self.render_options.width * res_mul,
-				height: self.render_options.height * res_mul,
-				max_iterations: self.export_iterations,
-				..self.render_options.clone()
+				width: self.settings.width * res_mul,
+				height: self.settings.height * res_mul,
+				iterations: self.export_iterations,
+				..self.settings.clone()
 			};
 
 			channel
@@ -217,23 +217,18 @@ impl eframe::App for JuliaGUI {
 
 				let set_point_vis = ui.checkbox(&mut self.preview_point, "View C point");
 				ui.label("C point (X, Y):");
-				let set_cx = ui.add(Slider::new(&mut self.render_options.cx, -2.0..=2.0));
-				let set_cy = ui.add(Slider::new(&mut self.render_options.cy, -2.0..=2.0));
+				let set_cx =
+					ui.add(Slider::new(&mut self.settings.cx, -1.0..=1.0).clamp_to_range(false));
+				let set_cy =
+					ui.add(Slider::new(&mut self.settings.cy, -1.0..=1.0).clamp_to_range(false));
 				ui.label("render width:");
-				let set_unit_width =
-					ui.add(Slider::new(&mut self.render_options.unit_width, 0.1..=6.0));
+				let set_unit_width = ui.add(Slider::new(&mut self.settings.unit_width, 0.1..=6.0));
 				ui.label("Fill style:");
 				ui.horizontal(|ui| {
-					let set_black = ui.radio_value(
-						&mut self.render_options.fill_style,
-						FillStyle::Black,
-						"Black",
-					);
-					let set_bright = ui.radio_value(
-						&mut self.render_options.fill_style,
-						FillStyle::Bright,
-						"Bright",
-					);
+					let set_black =
+						ui.radio_value(&mut self.settings.fill_style, FillStyle::Black, "Black");
+					let set_bright =
+						ui.radio_value(&mut self.settings.fill_style, FillStyle::Bright, "Bright");
 					if set_bright.changed() || set_black.changed() {
 						self.settings_changed = true;
 					}
@@ -277,22 +272,19 @@ impl eframe::App for JuliaGUI {
 				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=16));
 
 				ui.label("Preview iterations:");
-				let set_iter = ui.add(
-					Slider::new(&mut self.render_options.max_iterations, 5..=256)
-						.clamp_to_range(false),
-				);
+				let set_iter = ui
+					.add(Slider::new(&mut self.settings.iterations, 5..=256).clamp_to_range(false));
 
-				ui.label(RichText::new("Render settings").heading());
 				ui.label("Preview resolution:");
 				ui.horizontal(|ui| {
 					let set_width = ui.add(
-						DragValue::new(&mut self.render_options.width)
+						DragValue::new(&mut self.settings.width)
 							.clamp_range(128..=2048)
 							.suffix("px"),
 					);
 					ui.label("x");
 					let set_height = ui.add(
-						DragValue::new(&mut self.render_options.height)
+						DragValue::new(&mut self.settings.height)
 							.clamp_range(128..=2048)
 							.suffix("px"),
 					);
@@ -302,23 +294,18 @@ impl eframe::App for JuliaGUI {
 				});
 				ui.menu_button("presets", |ui| {
 					if ui.button("1:1 512x512").clicked() {
-						self.render_options.width = 512;
-						self.render_options.height = 512;
+						self.settings.width = 512;
+						self.settings.height = 512;
 						self.settings_changed = true;
 					}
 					if ui.button("16:9 960x540 (half hd)").clicked() {
-						self.render_options.width = 960;
-						self.render_options.height = 540;
-						self.settings_changed = true;
-					}
-					if ui.button("4:3 640x540").clicked() {
-						self.render_options.width = 640;
-						self.render_options.height = 540;
+						self.settings.width = 960;
+						self.settings.height = 540;
 						self.settings_changed = true;
 					}
 					if ui.button("2:1 1024x512").clicked() {
-						self.render_options.width = 1024;
-						self.render_options.height = 512;
+						self.settings.width = 1024;
+						self.settings.height = 512;
 						self.settings_changed = true;
 					}
 				});
@@ -329,8 +316,8 @@ impl eframe::App for JuliaGUI {
 				ui.add(Slider::new(&mut self.export_res_power, 0..=6).clamp_to_range(false));
 				ui.label(format!(
 					"Render resolution: {}x{}",
-					(1 << self.export_res_power) * self.render_options.width,
-					(1 << self.export_res_power) * self.render_options.height
+					(1 << self.export_res_power) * self.settings.width,
+					(1 << self.export_res_power) * self.settings.height
 				));
 
 				ui.horizontal(|ui| {
@@ -358,6 +345,21 @@ impl eframe::App for JuliaGUI {
 						.to_string_lossy()
 						.to_string(),
 				);
+
+				let predicted_render_time = (self.preview_render_ms
+					* (1 << self.export_res_power * 2) as f64
+					* (self.export_iterations as f64 / self.settings.iterations as f64)
+					/ 1000.0)
+					.floor();
+				if predicted_render_time < 60.0 {
+					ui.label(format!("Predicted render time: {predicted_render_time}s"));
+				} else {
+					ui.label(format!(
+						"Predicted render time: {:.1} min",
+						predicted_render_time / 60.0
+					));
+				}
+
 				if let Some(ms) = self.export_render_ms {
 					ui.label(format!("(took {ms:.2}ms)"));
 				}

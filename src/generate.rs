@@ -7,7 +7,7 @@ pub struct RenderOptions {
 	pub width: u32,
 	pub height: u32,
 	pub unit_width: f64,
-	pub max_iterations: u32,
+	pub iterations: u32,
 	pub cx: f64,
 	pub cy: f64,
 	pub fill_style: FillStyle,
@@ -25,7 +25,7 @@ impl Default for RenderOptions {
 			width: 512,
 			height: 512,
 			unit_width: 4.0,
-			max_iterations: 128,
+			iterations: 128,
 			cx: -0.8,
 			cy: -0.27,
 			fill_style: FillStyle::Bright,
@@ -49,8 +49,8 @@ pub fn view_point(q: &RenderOptions, image: RgbImage) -> RgbImage {
 pub fn render(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
 	let img = RgbImage::new(q.width, q.height);
 	apply_fn(img, q, |x, y| {
-		let i = julia(x, y, q.cx, q.cy, q.max_iterations);
-		if q.fill_style == FillStyle::Black && i == q.max_iterations {
+		let i = julia(x, y, q.cx, q.cy, q.iterations);
+		if q.fill_style == FillStyle::Black && i == q.iterations {
 			None
 		} else {
 			let i = i.min(255) as u8;
