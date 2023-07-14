@@ -3,6 +3,8 @@ use std::{
 	fs::{self, File},
 	io::Write,
 	path::PathBuf,
+	sync::mpsc::{self, Receiver, Sender},
+	thread::{self, JoinHandle},
 	time::SystemTime,
 };
 
@@ -51,6 +53,19 @@ struct JuliaGUI {
 	#[serde(skip)]
 	settings_changed: bool,
 	preview_point: bool,
+	#[serde(skip)]
+	render_thread_handle: Option<JoinHandle<()>>,
+	#[serde(skip)]
+	render_thread: Option<Sender<RenderJob>>,
+	#[serde(skip)]
+	render_result: Option<Receiver<f64>>,
+	#[serde(skip)]
+	waiting: bool,
+}
+
+enum RenderJob {
+	Render(PathBuf, RenderOptions, (u8, u8, u8)),
+	Exit,
 }
 
 impl Default for JuliaGUI {
@@ -65,7 +80,11 @@ impl Default for JuliaGUI {
 			export_iterations: 512,
 			export_path: "".into(),
 			settings_changed: true,
-			preview_point: true,
+			preview_point: false,
+			render_thread_handle: None,
+			render_thread: None,
+			render_result: None,
+			waiting: false,
 		}
 	}
 }
@@ -84,9 +103,34 @@ impl JuliaGUI {
 			TextureOptions::default(),
 		);
 
+		let (job_sender, job_receiver) = mpsc::channel::<RenderJob>();
+		let (result_sender, result_receiver) = mpsc::channel::<f64>();
+		let render_thread = thread::Builder::new()
+			.name("render".into())
+			.spawn(move || loop {
+				if let Ok(job) = job_receiver.recv() {
+					match job {
+						RenderJob::Exit => break,
+						RenderJob::Render(path, options, color) => {
+							let start_time = SystemTime::now();
+							let image = render(&options, color);
+							if let Err(err) = image.save(&path) {
+								println!("Failed to save render: {err}");
+							}
+							let time = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
+							result_sender.send(time).unwrap();
+						}
+					}
+				}
+			})
+			.unwrap();
+
 		n.preview = Some(preview);
 		n.settings_changed = true;
 		n.export_path = "julia_fractal.png".into();
+		n.render_thread_handle = Some(render_thread);
+		n.render_thread = Some(job_sender);
+		n.render_result = Some(result_receiver);
 		n
 	}
 
@@ -116,20 +160,25 @@ impl JuliaGUI {
 	}
 
 	fn export_render(&mut self) {
-		let start_time = SystemTime::now();
-		let res_mul = 1 << self.export_res_power;
-		let settings = RenderOptions {
-			width: self.render_options.width * res_mul,
-			height: self.render_options.height * res_mul,
-			max_iterations: self.export_iterations,
-			..self.render_options.clone()
-		};
-		let image = render(&settings, self.color);
-		if let Err(err) = image.save(&self.export_path) {
-			println!("Error exporting render: {err}");
-		}
-		self.export_render_ms = Some(start_time.elapsed().unwrap().as_micros() as f64 / 1000.0);
 		self.save_settings();
+		if let Some(channel) = &self.render_thread {
+			let res_mul = 1 << self.export_res_power;
+			let settings = RenderOptions {
+				width: self.render_options.width * res_mul,
+				height: self.render_options.height * res_mul,
+				max_iterations: self.export_iterations,
+				..self.render_options.clone()
+			};
+
+			channel
+				.send(RenderJob::Render(
+					self.export_path.clone(),
+					settings,
+					self.color,
+				))
+				.expect("failed to start render job");
+			self.waiting = true;
+		}
 	}
 
 	fn export_render_new_path(&mut self) {
@@ -150,6 +199,11 @@ impl eframe::App for JuliaGUI {
 			self.update_preview();
 			self.save_settings();
 			self.settings_changed = false;
+		}
+
+		if let Some(result) = self.render_result.as_mut().and_then(|r| r.try_recv().ok()) {
+			self.export_render_ms = Some(result);
+			self.waiting = false;
 		}
 
 		egui::SidePanel::left("main_left_panel")
@@ -280,19 +334,23 @@ impl eframe::App for JuliaGUI {
 				));
 
 				ui.horizontal(|ui| {
-					let export_text = if self.export_path.is_file() {
-						"Overwrite"
-					} else {
-						"Render"
-					};
-					if ui.button(export_text).clicked() {
-						self.export_render();
-					}
-					if ui.button("Render to").clicked() {
-						self.export_render_new_path();
+					ui.add_enabled_ui(!self.waiting, |ui| {
+						let export_text = if self.export_path.is_file() {
+							"Overwrite"
+						} else {
+							"Render"
+						};
+						if ui.button(export_text).clicked() {
+							self.export_render();
+						}
+						if ui.button("Render to").clicked() {
+							self.export_render_new_path();
+						}
+					});
+					if self.waiting {
+						ui.spinner();
 					}
 				});
-
 				ui.label(
 					self.export_path
 						.file_name()
@@ -323,6 +381,10 @@ impl eframe::App for JuliaGUI {
 	}
 
 	fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+		if let Some(channel) = &self.render_thread {
+			channel.send(RenderJob::Exit).unwrap();
+		}
+		self.render_thread_handle.take().unwrap().join().unwrap();
 		self.save_settings();
 	}
 }
