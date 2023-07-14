@@ -1,5 +1,5 @@
 [package]
-name = "julia-set"
+name = "julia-fractal-renderer"
 version = "1.0.0"
 edition = "2021"
 
