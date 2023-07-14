@@ -349,7 +349,7 @@ impl eframe::App for JuliaGUI {
 				);
 
 				let predicted_render_time = (self.preview_render_ms
-					* (1 << self.export_res_power * 2) as f64
+					* (1 << (self.export_res_power * 2)) as f64
 					* (self.export_iterations as f64 / self.settings.iterations as f64)
 					/ 1000.0)
 					.floor();
