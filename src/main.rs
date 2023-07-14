@@ -9,7 +9,7 @@ use std::{
 };
 
 use eframe::{
-	egui::{self, DragValue, RichText, Slider, TextureOptions},
+	egui::{self, DragValue, Slider, TextureOptions},
 	epaint::{TextureHandle, Vec2},
 	Frame, NativeOptions,
 };
@@ -275,7 +275,26 @@ impl eframe::App for JuliaGUI {
 				let set_iter = ui
 					.add(Slider::new(&mut self.settings.iterations, 5..=256).clamp_to_range(false));
 
-				ui.label("Preview resolution:");
+				ui.horizontal(|ui| {
+					ui.label("Preview resolution:");
+					ui.menu_button("presets", |ui| {
+						if ui.button("1:1 512x512").clicked() {
+							self.settings.width = 512;
+							self.settings.height = 512;
+							self.settings_changed = true;
+						}
+						if ui.button("16:9 960x540 (half hd)").clicked() {
+							self.settings.width = 960;
+							self.settings.height = 540;
+							self.settings_changed = true;
+						}
+						if ui.button("2:1 1024x512").clicked() {
+							self.settings.width = 1024;
+							self.settings.height = 512;
+							self.settings_changed = true;
+						}
+					});
+				});
 				ui.horizontal(|ui| {
 					let set_width = ui.add(
 						DragValue::new(&mut self.settings.width)
@@ -289,23 +308,6 @@ impl eframe::App for JuliaGUI {
 							.suffix("px"),
 					);
 					if set_width.changed() || set_height.changed() {
-						self.settings_changed = true;
-					}
-				});
-				ui.menu_button("presets", |ui| {
-					if ui.button("1:1 512x512").clicked() {
-						self.settings.width = 512;
-						self.settings.height = 512;
-						self.settings_changed = true;
-					}
-					if ui.button("16:9 960x540 (half hd)").clicked() {
-						self.settings.width = 960;
-						self.settings.height = 540;
-						self.settings_changed = true;
-					}
-					if ui.button("2:1 1024x512").clicked() {
-						self.settings.width = 1024;
-						self.settings.height = 512;
 						self.settings_changed = true;
 					}
 				});
