@@ -43,7 +43,7 @@ struct JuliaGUI {
 	#[serde(skip)]
 	preview_render_ms: f64,
 	#[serde(skip)]
-	export_render_ms: f64,
+	export_render_ms: Option<f64>,
 	export_res_multiplier: u32,
 	export_iterations: u32,
 	export_name: String,
@@ -58,7 +58,7 @@ impl Default for JuliaGUI {
 			preview: None,
 			render_options: RenderOptions::default(),
 			preview_render_ms: 0.0,
-			export_render_ms: f64::NAN,
+			export_render_ms: None,
 			export_res_multiplier: 8,
 			export_iterations: 512,
 			export_name: String::from("julia_fractal.png"),
@@ -120,7 +120,7 @@ impl JuliaGUI {
 		if let Err(err) = image.save(&self.export_name) {
 			println!("Error exporting render: {err}");
 		}
-		self.export_render_ms = start_time.elapsed().unwrap().as_micros() as f64 / 1000.0;
+		self.export_render_ms = Some(start_time.elapsed().unwrap().as_micros() as f64 / 1000.0);
 		self.save_settings();
 	}
 }
@@ -167,9 +167,9 @@ impl eframe::App for JuliaGUI {
 				});
 
 				ui.label("Colour (RGB)");
-				let set_red = ui.add(Slider::new(&mut self.color.0, 0..=32));
-				let set_green = ui.add(Slider::new(&mut self.color.1, 0..=32));
-				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=32));
+				let set_red = ui.add(Slider::new(&mut self.color.0, 0..=16));
+				let set_green = ui.add(Slider::new(&mut self.color.1, 0..=16));
+				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=16));
 
 				ui.label("Preview iterations:");
 				let set_iter = ui.add(
@@ -224,8 +224,8 @@ impl eframe::App for JuliaGUI {
 					if ui.button("Render").clicked() {
 						self.export_render();
 					}
-					if !self.export_render_ms.is_nan() {
-						ui.label(format!("(took {:.2}ms)", self.export_render_ms));
+					if let Some(ms) = self.export_render_ms {
+						ui.label(format!("(took {:.2}ms)", ms));
 					}
 				});
 
