@@ -362,9 +362,12 @@ impl eframe::App for JuliaGUI {
 					));
 				}
 
-				if let Some(ms) = self.export_render_ms {
-					ui.label(format!("(took {ms:.2}ms)"));
-				}
+				ui.label(
+					self.export_render_ms
+						.map(|ms| format!("took {ms:.2}ms"))
+						.unwrap_or_default(),
+				);
+				ui.label(format!("version {}", env!("CARGO_PKG_VERSION")));
 
 				if set_cx.changed()
 					|| set_cy.changed() || set_unit_width.changed()

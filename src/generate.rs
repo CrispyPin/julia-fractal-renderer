@@ -26,8 +26,8 @@ impl Default for RenderOptions {
 			height: 512,
 			unit_width: 4.0,
 			iterations: 128,
-			cx: -0.8,
-			cy: -0.27,
+			cx: 0.4,
+			cy: -0.2,
 			fill_style: FillStyle::Bright,
 		}
 	}
@@ -36,9 +36,9 @@ impl Default for RenderOptions {
 pub fn view_point(q: &RenderOptions, image: RgbImage) -> RgbImage {
 	apply_fn(image, q, |x, y| {
 		let len = (Vec2::new(x as f32, y as f32) - Vec2::new(q.cx as f32, q.cy as f32)).length();
-		if len < 0.04 {
-			Some(Rgb([0, 255, 255]))
-		} else if len < 0.05 {
+		if len < 0.03 {
+			Some(Rgb([0, 120, 120]))
+		} else if len < 0.04 {
 			Some(Rgb([255; 3]))
 		} else {
 			None
