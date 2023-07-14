@@ -11,7 +11,7 @@ use eframe::{
 	epaint::{TextureHandle, Vec2},
 	Frame, NativeOptions,
 };
-use generate::{render, FillStyle, RenderOptions};
+use generate::{render, view_point, FillStyle, RenderOptions};
 use image::EncodableLayout;
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -50,6 +50,7 @@ struct JuliaGUI {
 	export_path: PathBuf,
 	#[serde(skip)]
 	settings_changed: bool,
+	preview_point: bool,
 }
 
 impl Default for JuliaGUI {
@@ -60,10 +61,11 @@ impl Default for JuliaGUI {
 			render_options: RenderOptions::default(),
 			preview_render_ms: 0.0,
 			export_render_ms: None,
-			export_res_power: 8,
+			export_res_power: 3,
 			export_iterations: 512,
 			export_path: "".into(),
 			settings_changed: true,
+			preview_point: true,
 		}
 	}
 }
@@ -96,7 +98,10 @@ impl JuliaGUI {
 
 	fn update_preview(&mut self) {
 		let start_time = SystemTime::now();
-		let frame = render(&self.render_options, self.color);
+		let mut frame = render(&self.render_options, self.color);
+		if self.preview_point {
+			frame = view_point(&self.render_options, frame);
+		}
 
 		if let Some(preview) = &mut self.preview {
 			preview.set(
@@ -129,7 +134,7 @@ impl JuliaGUI {
 
 	fn export_render_new_path(&mut self) {
 		if let Ok(Some(path)) = FileDialog::new()
-			.set_filename(&self.export_path.to_string_lossy().to_string())
+			.set_filename(&self.export_path.to_string_lossy())
 			.add_filter("PNG file", &["png"])
 			.show_save_single_file()
 		{
@@ -156,6 +161,7 @@ impl eframe::App for JuliaGUI {
 					self.preview_render_ms
 				));
 
+				let set_point_vis = ui.checkbox(&mut self.preview_point, "View C point");
 				ui.label("CX:");
 				let set_cx = ui.add(Slider::new(&mut self.render_options.cx, -2.0..=2.0));
 				ui.label("CY:");
@@ -242,7 +248,7 @@ impl eframe::App for JuliaGUI {
 						.to_string(),
 				);
 				if let Some(ms) = self.export_render_ms {
-					ui.label(format!("(took {:.2}ms)", ms));
+					ui.label(format!("(took {ms:.2}ms)"));
 				}
 
 				if set_cx.changed()
@@ -250,6 +256,7 @@ impl eframe::App for JuliaGUI {
 					|| set_iter.changed()
 					|| set_red.changed() || set_green.changed()
 					|| set_blue.changed()
+					|| set_point_vis.changed()
 				{
 					self.settings_changed = true;
 				}
@@ -263,6 +270,6 @@ impl eframe::App for JuliaGUI {
 	}
 
 	fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-		self.save_settings()
+		self.save_settings();
 	}
 }

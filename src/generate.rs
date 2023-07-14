@@ -1,3 +1,4 @@
+use eframe::epaint::Vec2;
 use image::{Rgb, RgbImage};
 use serde::{Deserialize, Serialize};
 
@@ -32,35 +33,54 @@ impl Default for RenderOptions {
 	}
 }
 
-pub fn render(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
-	let mut img = RgbImage::new(q.width, q.height);
+pub fn view_point(q: &RenderOptions, image: RgbImage) -> RgbImage {
+	apply_fn(image, q, |x, y| {
+		let len = (Vec2::new(x as f32, y as f32) - Vec2::new(q.cx as f32, q.cy as f32)).length();
+		if len < 0.04 {
+			Some(Rgb([0, 255, 255]))
+		} else if len < 0.05 {
+			Some(Rgb([255; 3]))
+		} else {
+			None
+		}
+	})
+}
 
-	let width: f64 = q.width.into();
-	let height: f64 = q.height.into();
+pub fn render(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
+	let img = RgbImage::new(q.width, q.height);
+	apply_fn(img, q, |x, y| {
+		let i = julia(x, y, q.cx, q.cy, q.max_iterations);
+		if q.fill_style == FillStyle::Black && i == q.max_iterations {
+			None
+		} else {
+			let i = i.min(255) as u8;
+			Some(Rgb([
+				i.saturating_mul(color.0),
+				i.saturating_mul(color.1),
+				i.saturating_mul(color.2),
+			]))
+		}
+	})
+}
+
+fn apply_fn<F>(mut image: RgbImage, q: &RenderOptions, op: F) -> RgbImage
+where
+	F: Fn(f64, f64) -> Option<Rgb<u8>>,
+{
+	let width = q.width as f64;
+	let height = q.height as f64;
 	let ppu = width / q.unit_width;
 
 	for y in 0..q.height {
 		for x in 0..q.width {
-			let pixel = {
-				let x = (f64::from(x) - width / 2.0) / ppu;
-				let y = (f64::from(y) - height / 2.0) / ppu;
-
-				let iter = julia(x, y, q.cx, q.cy, q.max_iterations);
-				if q.fill_style == FillStyle::Black && iter == q.max_iterations {
-					Rgb([0, 0, 0])
-				} else {
-					let i = iter.min(255) as u8;
-					Rgb([
-						i.saturating_mul(color.0),
-						i.saturating_mul(color.1),
-						i.saturating_mul(color.2),
-					])
-				}
-			};
-			img.put_pixel(x, y, pixel);
+			let sx = (x as f64 - width / 2.0) / ppu;
+			let sy = (y as f64 - height / 2.0) / ppu;
+			if let Some(pixel) = op(sx, sy) {
+				image.put_pixel(x, y, pixel);
+			}
 		}
 	}
-	img
+	image
 }
 
 fn julia(mut x: f64, mut y: f64, cx: f64, cy: f64, max_iter: u32) -> u32 {
