@@ -13,7 +13,7 @@ use eframe::{
 	epaint::{TextureHandle, Vec2},
 	Frame, NativeOptions,
 };
-use generate::{render, view_point, FillStyle, RenderOptions};
+use generate::{render_c, render_julia, FillStyle, RenderOptions};
 use image::EncodableLayout;
 use native_dialog::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -47,7 +47,7 @@ struct JuliaGUI {
 	#[serde(skip)]
 	export_render_ms: Option<f64>,
 	export_res_power: u8,
-	export_iterations: u32,
+	export_max_iter: u16,
 	#[serde(skip)]
 	export_path: PathBuf,
 	#[serde(skip)]
@@ -77,7 +77,7 @@ impl Default for JuliaGUI {
 			preview_render_ms: 0.0,
 			export_render_ms: None,
 			export_res_power: 3,
-			export_iterations: 512,
+			export_max_iter: 512,
 			export_path: "".into(),
 			settings_changed: true,
 			preview_point: false,
@@ -113,7 +113,7 @@ impl JuliaGUI {
 						RenderJob::Exit => break,
 						RenderJob::Render(path, options, color) => {
 							let start_time = SystemTime::now();
-							let image = render(&options, color);
+							let image = render_julia(&options, color);
 							if let Err(err) = image.save(&path) {
 								println!("Failed to save render: {err}");
 							}
@@ -142,9 +142,9 @@ impl JuliaGUI {
 
 	fn update_preview(&mut self) {
 		let start_time = SystemTime::now();
-		let mut frame = render(&self.settings, self.color);
+		let mut frame = render_julia(&self.settings, self.color);
 		if self.preview_point {
-			frame = view_point(&self.settings, frame);
+			frame = render_c(&self.settings, frame);
 		}
 
 		if let Some(preview) = &mut self.preview {
@@ -166,7 +166,7 @@ impl JuliaGUI {
 			let settings = RenderOptions {
 				width: self.settings.width * res_mul,
 				height: self.settings.height * res_mul,
-				iterations: self.export_iterations,
+				max_iter: self.export_max_iter,
 				..self.settings.clone()
 			};
 
@@ -272,8 +272,8 @@ impl eframe::App for JuliaGUI {
 				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=16));
 
 				ui.label("Preview iterations:");
-				let set_iter = ui
-					.add(Slider::new(&mut self.settings.iterations, 5..=256).clamp_to_range(false));
+				let set_iter =
+					ui.add(Slider::new(&mut self.settings.max_iter, 5..=256).clamp_to_range(false));
 
 				ui.horizontal(|ui| {
 					ui.label("Preview resolution:");
@@ -313,7 +313,7 @@ impl eframe::App for JuliaGUI {
 				});
 
 				ui.label("Render iterations:");
-				ui.add(Slider::new(&mut self.export_iterations, 5..=1024).clamp_to_range(false));
+				ui.add(Slider::new(&mut self.export_max_iter, 5..=1024).clamp_to_range(false));
 				ui.label("Render resolution:");
 				ui.add(Slider::new(&mut self.export_res_power, 0..=6).clamp_to_range(false));
 				ui.label(format!(
@@ -350,7 +350,7 @@ impl eframe::App for JuliaGUI {
 
 				let predicted_render_time = (self.preview_render_ms
 					* (1 << (self.export_res_power * 2)) as f64
-					* (self.export_iterations as f64 / self.settings.iterations as f64)
+					* (self.export_max_iter as f64 / self.settings.max_iter as f64)
 					/ 1000.0)
 					.floor();
 				if predicted_render_time < 60.0 {
