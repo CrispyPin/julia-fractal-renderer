@@ -1,4 +1,7 @@
 /target
+*.zip
+*.xz
+
 *.png
-!images/*.png
+!images/*
 fractal_settings.json
