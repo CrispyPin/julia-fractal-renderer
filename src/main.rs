@@ -162,9 +162,8 @@ impl eframe::App for JuliaGUI {
 				));
 
 				let set_point_vis = ui.checkbox(&mut self.preview_point, "View C point");
-				ui.label("CX:");
+				ui.label("C point (X, Y):");
 				let set_cx = ui.add(Slider::new(&mut self.render_options.cx, -2.0..=2.0));
-				ui.label("CY:");
 				let set_cy = ui.add(Slider::new(&mut self.render_options.cy, -2.0..=2.0));
 				ui.label("render width:");
 				let set_unit_width =
@@ -186,7 +185,39 @@ impl eframe::App for JuliaGUI {
 					}
 				});
 
-				ui.label("Colour (RGB)");
+				ui.horizontal(|ui| {
+					ui.label("Colour (RGB)");
+					ui.menu_button("presets", |ui| {
+						if ui.button("pink").clicked() {
+							self.color = (8, 2, 6);
+							self.settings_changed = true;
+						}
+						if ui.button("blue").clicked() {
+							self.color = (2, 4, 8);
+							self.settings_changed = true;
+						}
+						if ui.button("green").clicked() {
+							self.color = (2, 8, 4);
+							self.settings_changed = true;
+						}
+						if ui.button("salmon").clicked() {
+							self.color = (8, 4, 4);
+							self.settings_changed = true;
+						}
+						if ui.button("purple").clicked() {
+							self.color = (5, 2, 11);
+							self.settings_changed = true;
+						}
+						if ui.button("randomise").clicked() {
+							self.color = (
+								rand::random::<u8>() & 15,
+								rand::random::<u8>() & 15,
+								rand::random::<u8>() & 15,
+							);
+							self.settings_changed = true;
+						}
+					});
+				});
 				let set_red = ui.add(Slider::new(&mut self.color.0, 0..=16));
 				let set_green = ui.add(Slider::new(&mut self.color.1, 0..=16));
 				let set_blue = ui.add(Slider::new(&mut self.color.2, 0..=16));
@@ -202,16 +233,38 @@ impl eframe::App for JuliaGUI {
 				ui.horizontal(|ui| {
 					let set_width = ui.add(
 						DragValue::new(&mut self.render_options.width)
-							.clamp_range(128..=4096)
+							.clamp_range(128..=2048)
 							.suffix("px"),
 					);
 					ui.label("x");
 					let set_height = ui.add(
 						DragValue::new(&mut self.render_options.height)
-							.clamp_range(128..=4096)
+							.clamp_range(128..=2048)
 							.suffix("px"),
 					);
 					if set_width.changed() || set_height.changed() {
+						self.settings_changed = true;
+					}
+				});
+				ui.menu_button("presets", |ui| {
+					if ui.button("1:1 512x512").clicked() {
+						self.render_options.width = 512;
+						self.render_options.height = 512;
+						self.settings_changed = true;
+					}
+					if ui.button("16:9 960x540 (half hd)").clicked() {
+						self.render_options.width = 960;
+						self.render_options.height = 540;
+						self.settings_changed = true;
+					}
+					if ui.button("4:3 640x540").clicked() {
+						self.render_options.width = 640;
+						self.render_options.height = 540;
+						self.settings_changed = true;
+					}
+					if ui.button("2:1 1024x512").clicked() {
+						self.render_options.width = 1024;
+						self.render_options.height = 512;
 						self.settings_changed = true;
 					}
 				});
