@@ -1,8 +1,8 @@
 #![windows_subsystem = "windows"]
 use std::{
-	env,
 	fs::{self, File},
 	io::Write,
+	path::PathBuf,
 	time::SystemTime,
 };
 
@@ -44,9 +44,10 @@ struct JuliaGUI {
 	preview_render_ms: f64,
 	#[serde(skip)]
 	export_render_ms: Option<f64>,
-	export_res_multiplier: u32,
+	export_res_power: u8,
 	export_iterations: u32,
-	export_name: String,
+	#[serde(skip)]
+	export_path: PathBuf,
 	#[serde(skip)]
 	settings_changed: bool,
 }
@@ -59,9 +60,9 @@ impl Default for JuliaGUI {
 			render_options: RenderOptions::default(),
 			preview_render_ms: 0.0,
 			export_render_ms: None,
-			export_res_multiplier: 8,
+			export_res_power: 8,
 			export_iterations: 512,
-			export_name: String::from("julia_fractal.png"),
+			export_path: "".into(),
 			settings_changed: true,
 		}
 	}
@@ -83,6 +84,7 @@ impl JuliaGUI {
 
 		n.preview = Some(preview);
 		n.settings_changed = true;
+		n.export_path = "julia_fractal.png".into();
 		n
 	}
 
@@ -110,18 +112,30 @@ impl JuliaGUI {
 
 	fn export_render(&mut self) {
 		let start_time = SystemTime::now();
+		let res_mul = 1 << self.export_res_power;
 		let settings = RenderOptions {
-			width: self.render_options.width * self.export_res_multiplier,
-			height: self.render_options.height * self.export_res_multiplier,
+			width: self.render_options.width * res_mul,
+			height: self.render_options.height * res_mul,
 			max_iterations: self.export_iterations,
 			..self.render_options.clone()
 		};
 		let image = render(&settings, self.color);
-		if let Err(err) = image.save(&self.export_name) {
+		if let Err(err) = image.save(&self.export_path) {
 			println!("Error exporting render: {err}");
 		}
 		self.export_render_ms = Some(start_time.elapsed().unwrap().as_micros() as f64 / 1000.0);
 		self.save_settings();
+	}
+
+	fn export_render_new_path(&mut self) {
+		if let Ok(Some(path)) = FileDialog::new()
+			.set_filename(&self.export_path.to_string_lossy().to_string())
+			.add_filter("PNG file", &["png"])
+			.show_save_single_file()
+		{
+			self.export_path = path;
+			self.export_render();
+		}
 	}
 }
 
@@ -196,38 +210,40 @@ impl eframe::App for JuliaGUI {
 					}
 				});
 
-				ui.label("Export iterations:");
+				ui.label("Render iterations:");
 				ui.add(Slider::new(&mut self.export_iterations, 5..=1024).clamp_to_range(false));
-				ui.label("Resolution multiplier:");
-				ui.add(Slider::new(&mut self.export_res_multiplier, 1..=32));
+				ui.label("Render resolution:");
+				ui.add(Slider::new(&mut self.export_res_power, 0..=6).clamp_to_range(false));
 				ui.label(format!(
-					"Export resolution: {}x{}",
-					self.export_res_multiplier * self.render_options.width,
-					self.export_res_multiplier * self.render_options.height
+					"Render resolution: {}x{}",
+					(1 << self.export_res_power) * self.render_options.width,
+					(1 << self.export_res_power) * self.render_options.height
 				));
 
-				if ui.button("Select file").clicked() {
-					if let Ok(Some(path)) = FileDialog::new()
-						.set_filename(&self.export_name)
-						.add_filter("PNG file", &["png"])
-						.show_save_single_file()
-					{
-						self.export_name = path
-							.strip_prefix(env::current_dir().unwrap())
-							.unwrap_or(&path)
-							.to_string_lossy()
-							.to_string();
-					}
-				}
-				ui.label(&self.export_name);
 				ui.horizontal(|ui| {
-					if ui.button("Render").clicked() {
+					let export_text = if self.export_path.is_file() {
+						"Overwrite"
+					} else {
+						"Render"
+					};
+					if ui.button(export_text).clicked() {
 						self.export_render();
 					}
-					if let Some(ms) = self.export_render_ms {
-						ui.label(format!("(took {:.2}ms)", ms));
+					if ui.button("Render to").clicked() {
+						self.export_render_new_path();
 					}
 				});
+
+				ui.label(
+					self.export_path
+						.file_name()
+						.unwrap_or_default()
+						.to_string_lossy()
+						.to_string(),
+				);
+				if let Some(ms) = self.export_render_ms {
+					ui.label(format!("(took {:.2}ms)", ms));
+				}
 
 				if set_cx.changed()
 					|| set_cy.changed() || set_unit_width.changed()
