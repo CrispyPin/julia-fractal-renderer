@@ -229,27 +229,26 @@ impl eframe::App for JuliaGUI {
 			.exact_width(200.0)
 			.show(ctx, |ui| {
 				ui.label(format!(
-					"Preview render took {:.2}ms",
-					self.preview_render_ms
+					"Preview render took {}",
+					format_time(self.preview_render_ms, true)
 				));
 
-				let set_point_vis = ui.checkbox(&mut self.preview_point, "View C point");
-				ui.label("C point (X, Y):");
+				let set_point_vis = ui.checkbox(&mut self.preview_point, "View offset point");
+				ui.label("Offset point (x, y):");
 				let set_cx =
 					ui.add(Slider::new(&mut self.settings.cx, -1.0..=1.0).clamp_to_range(false));
 				let set_cy =
 					ui.add(Slider::new(&mut self.settings.cy, -1.0..=1.0).clamp_to_range(false));
-				ui.label("render width:");
+				ui.label("Width:");
 				let set_unit_width = ui.add(Slider::new(&mut self.settings.unit_width, 0.1..=6.0));
-				ui.label("Fill style:");
 				ui.horizontal(|ui| {
-					let set_black =
-						ui.radio_value(&mut self.settings.fill_style, FillStyle::Black, "Black");
-					let set_bright =
-						ui.radio_value(&mut self.settings.fill_style, FillStyle::Bright, "Bright");
-					if set_bright.changed() || set_black.changed() {
-						self.settings_changed = true;
-					}
+					ui.label("Fill style:");
+					self.settings_changed |= ui
+						.radio_value(&mut self.settings.fill_style, FillStyle::Black, "Black")
+						.changed();
+					self.settings_changed |= ui
+						.radio_value(&mut self.settings.fill_style, FillStyle::Bright, "Bright")
+						.changed();
 				});
 
 				ui.horizontal(|ui| {
@@ -370,24 +369,19 @@ impl eframe::App for JuliaGUI {
 
 				let predicted_render_time = (self.preview_render_ms
 					* (1 << (self.export_res_power * 2)) as f64
-					* (self.export_max_iter as f64 / self.settings.max_iter as f64)
-					/ 1000.0)
+					* (self.export_max_iter as f64 / self.settings.max_iter as f64))
 					.floor();
-				if predicted_render_time < 60.0 {
-					ui.label(format!("Predicted render time: {predicted_render_time}s"));
-				} else {
-					ui.label(format!(
-						"Predicted render time: {:.1} min",
-						predicted_render_time / 60.0
-					));
-				}
+				ui.label(format!(
+					"Predicted render time: {}",
+					format_time(predicted_render_time, false)
+				));
 
 				ui.label(
 					self.export_render_ms
-						.map(|ms| format!("took {ms:.2}ms"))
+						.map(|ms| format!("Took {}", format_time(ms, true)))
 						.unwrap_or_default(),
 				);
-				ui.label(format!("version {}", env!("CARGO_PKG_VERSION")));
+				ui.label(format!("Version: {}", env!("CARGO_PKG_VERSION")));
 
 				if set_cx.changed()
 					|| set_cy.changed() || set_unit_width.changed()
@@ -413,5 +407,19 @@ impl eframe::App for JuliaGUI {
 			channel.send(RenderJob::Exit).unwrap();
 		}
 		self.render_thread_handle.take().unwrap().join().unwrap();
+	}
+}
+
+fn format_time(ms: f64, precise: bool) -> String {
+	if ms < 1000.0 {
+		if precise {
+			format!("{ms:.2}ms")
+		} else {
+			"<1s".into()
+		}
+	} else if ms < 60_000.0 {
+		format!("{:.1}s", ms / 1000.0)
+	} else {
+		format!("{:.1}m", ms / 60_000.0)
 	}
 }
