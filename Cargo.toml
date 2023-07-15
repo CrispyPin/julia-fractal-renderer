@@ -1,12 +1,15 @@
 [package]
 name = "julia-fractal-renderer"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe = "0.22.0"
+eframe = { version = "0.22.0", default-features = false, features = [
+	"glow",
+	"default_fonts",
+] }
 image = { version = "0.24.6", default-features = false, features = ["png"] }
 native-dialog = "0.6.4"
 rand = "0.8.5"
