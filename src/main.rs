@@ -39,20 +39,20 @@ fn main() {
 #[derive(Serialize, Deserialize)]
 struct JuliaGUI {
 	color: (u8, u8, u8),
+	settings: RenderOptions,
+	export_res_power: u8,
+	export_max_iter: u16,
+	preview_point: bool,
 	#[serde(skip)]
 	preview: Option<TextureHandle>,
-	settings: RenderOptions,
 	#[serde(skip)]
 	preview_render_ms: f64,
 	#[serde(skip)]
 	export_render_ms: Option<f64>,
-	export_res_power: u8,
-	export_max_iter: u16,
 	#[serde(skip)]
 	export_path: PathBuf,
 	#[serde(skip)]
 	settings_changed: bool,
-	preview_point: bool,
 	#[serde(skip)]
 	render_thread_handle: Option<JoinHandle<()>>,
 	#[serde(skip)]
@@ -255,6 +255,10 @@ impl eframe::App for JuliaGUI {
 						}
 						if ui.button("purple").clicked() {
 							self.color = (5, 2, 11);
+							self.settings_changed = true;
+						}
+						if ui.button("yellow").clicked() {
+							self.color = (9, 6, 1);
 							self.settings_changed = true;
 						}
 						if ui.button("randomise").clicked() {
