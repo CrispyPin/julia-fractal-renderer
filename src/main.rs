@@ -89,14 +89,14 @@ impl Default for JuliaGUI {
 		Self {
 			color: (12, 5, 10),
 			color_presets: default_color_presets(),
-			new_color_preset_name: "".into(),
+			new_color_preset_name: String::new(),
 			preview: None,
 			settings: RenderOptions::default(),
 			preview_render_ms: 0.0,
 			export_render_ms: None,
 			export_res_power: 3,
 			export_max_iter: 512,
-			export_path: "".into(),
+			export_path: PathBuf::new(),
 			settings_changed: true,
 			preview_point: false,
 			render_thread_handle: None,
@@ -408,10 +408,10 @@ impl eframe::App for JuliaGUI {
 	}
 
 	fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+		self.save_settings();
 		if let Some(channel) = &self.render_thread {
 			channel.send(RenderJob::Exit).unwrap();
 		}
 		self.render_thread_handle.take().unwrap().join().unwrap();
-		self.save_settings();
 	}
 }
