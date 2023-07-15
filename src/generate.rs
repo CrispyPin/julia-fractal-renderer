@@ -8,6 +8,7 @@ pub struct RenderOptions {
 	pub width: usize,
 	pub height: usize,
 	pub unit_width: f64,
+	#[serde(alias = "iterations")]
 	pub max_iter: u16,
 	pub cx: f64,
 	pub cy: f64,

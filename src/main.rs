@@ -41,8 +41,11 @@ struct JuliaGUI {
 	color: (u8, u8, u8),
 	settings: RenderOptions,
 	export_res_power: u8,
+	#[serde(alias = "export_iterations")]
 	export_max_iter: u16,
 	preview_point: bool,
+	#[serde(default = "default_color_presets")]
+	color_presets: Vec<(String, (u8, u8, u8))>,
 	#[serde(skip)]
 	preview: Option<TextureHandle>,
 	#[serde(skip)]
@@ -54,6 +57,8 @@ struct JuliaGUI {
 	#[serde(skip)]
 	settings_changed: bool,
 	#[serde(skip)]
+	new_color_preset_name: String,
+	#[serde(skip)]
 	render_thread_handle: Option<JoinHandle<()>>,
 	#[serde(skip)]
 	render_thread: Option<Sender<RenderJob>>,
@@ -61,6 +66,17 @@ struct JuliaGUI {
 	render_result: Option<Receiver<f64>>,
 	#[serde(skip)]
 	waiting: bool,
+}
+
+fn default_color_presets() -> Vec<(String, (u8, u8, u8))> {
+	vec![
+		("pink".into(), (8, 2, 6)),
+		("blue".into(), (2, 4, 8)),
+		("green".into(), (2, 8, 4)),
+		("salmon".into(), (8, 4, 4)),
+		("purple".into(), (5, 2, 11)),
+		("yellow".into(), (9, 6, 1)),
+	]
 }
 
 enum RenderJob {
@@ -72,6 +88,8 @@ impl Default for JuliaGUI {
 	fn default() -> Self {
 		Self {
 			color: (12, 5, 10),
+			color_presets: default_color_presets(),
+			new_color_preset_name: "".into(),
 			preview: None,
 			settings: RenderOptions::default(),
 			preview_render_ms: 0.0,
@@ -237,29 +255,20 @@ impl eframe::App for JuliaGUI {
 				ui.horizontal(|ui| {
 					ui.label("Colour (RGB)");
 					ui.menu_button("presets", |ui| {
-						if ui.button("pink").clicked() {
-							self.color = (8, 2, 6);
-							self.settings_changed = true;
+						let mut to_remove = None;
+						for (i, (name, col)) in self.color_presets.iter().enumerate() {
+							ui.horizontal(|ui| {
+								if ui.button(name).clicked() {
+									self.color = *col;
+									self.settings_changed = true;
+								}
+								if ui.button("x").clicked() {
+									to_remove = Some(i);
+								}
+							});
 						}
-						if ui.button("blue").clicked() {
-							self.color = (2, 4, 8);
-							self.settings_changed = true;
-						}
-						if ui.button("green").clicked() {
-							self.color = (2, 8, 4);
-							self.settings_changed = true;
-						}
-						if ui.button("salmon").clicked() {
-							self.color = (8, 4, 4);
-							self.settings_changed = true;
-						}
-						if ui.button("purple").clicked() {
-							self.color = (5, 2, 11);
-							self.settings_changed = true;
-						}
-						if ui.button("yellow").clicked() {
-							self.color = (9, 6, 1);
-							self.settings_changed = true;
+						if let Some(i) = to_remove {
+							self.color_presets.remove(i);
 						}
 						if ui.button("randomise").clicked() {
 							self.color = (
@@ -269,6 +278,13 @@ impl eframe::App for JuliaGUI {
 							);
 							self.settings_changed = true;
 						}
+						ui.horizontal(|ui| {
+							ui.text_edit_singleline(&mut self.new_color_preset_name);
+							if ui.button("add").clicked() {
+								self.color_presets
+									.push((self.new_color_preset_name.clone(), self.color));
+							}
+						})
 					});
 				});
 				let set_red = ui.add(Slider::new(&mut self.color.0, 0..=16));
