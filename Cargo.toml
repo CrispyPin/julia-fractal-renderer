@@ -6,10 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eframe = { version = "0.22.0", default-features = false, features = [
-	"glow",
-	"default_fonts",
-] }
+eframe = { version = "0.22.0", default-features = false, features = ["glow", "default_fonts"] }
 image = { version = "0.24.6", default-features = false, features = ["png"] }
 native-dialog = "0.6.4"
 rand = "0.8.5"

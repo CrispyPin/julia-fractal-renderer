@@ -250,6 +250,7 @@ impl eframe::App for JuliaGUI {
 						.radio_value(&mut self.settings.fill_style, FillStyle::Bright, "Bright")
 						.changed();
 				});
+				let set_invert = ui.checkbox(&mut self.settings.invert, "invert");
 
 				ui.horizontal(|ui| {
 					ui.label("Colour (RGB)");
@@ -389,6 +390,7 @@ impl eframe::App for JuliaGUI {
 					|| set_red.changed() || set_green.changed()
 					|| set_blue.changed()
 					|| set_point_vis.changed()
+					|| set_invert.changed()
 				{
 					self.settings_changed = true;
 				}

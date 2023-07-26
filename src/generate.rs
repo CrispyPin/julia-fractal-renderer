@@ -13,6 +13,8 @@ pub struct RenderOptions {
 	pub cx: f64,
 	pub cy: f64,
 	pub fill_style: FillStyle,
+	#[serde(default)]
+	pub invert: bool,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +33,7 @@ impl Default for RenderOptions {
 			cx: 0.4,
 			cy: -0.2,
 			fill_style: FillStyle::Bright,
+			invert: false,
 		}
 	}
 }
@@ -58,13 +61,18 @@ pub fn render_c(q: &RenderOptions, mut image: RgbImage) -> RgbImage {
 	image
 }
 
-pub fn color_iteration(iter: u16, color: (u8, u8, u8)) -> Rgb<u8> {
+pub fn color_iteration(iter: u16, color: (u8, u8, u8), invert: bool) -> Rgb<u8> {
 	let i = iter.min(255) as u8;
-	Rgb([
+	let (r, g, b) = (
 		i.saturating_mul(color.0),
 		i.saturating_mul(color.1),
 		i.saturating_mul(color.2),
-	])
+	);
+	if invert {
+		Rgb([255 - r, 255 - g, 255 - b])
+	} else {
+		Rgb([r, g, b])
+	}
 }
 
 pub fn render_julia(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
@@ -75,8 +83,8 @@ pub fn render_julia(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
 	let ppu = width / q.unit_width;
 
 	let fill = match q.fill_style {
-		FillStyle::Black => Rgb([0; 3]),
-		FillStyle::Bright => color_iteration(q.max_iter, color),
+		FillStyle::Black => Rgb([q.invert as u8 * 255; 3]),
+		FillStyle::Bright => color_iteration(q.max_iter, color, q.invert),
 	};
 
 	(0..q.height)
@@ -91,7 +99,7 @@ pub fn render_julia(q: &RenderOptions, color: (u8, u8, u8)) -> RgbImage {
 				if i == q.max_iter {
 					row.push(fill);
 				} else {
-					row.push(color_iteration(i, color));
+					row.push(color_iteration(i, color, q.invert));
 				}
 			}
 			row
